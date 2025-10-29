@@ -1,10 +1,7 @@
 # Dedup TUI
 
-## [Screenshot](./images)
-<img src="./images/screen-1.jpeg" alt="Alt Text" width="300" height="200">
-<img src="./images/screen-2.jpeg" alt="Alt Text" width="300" height="200">
-<img src="./images/screen-3.jpeg" alt="Alt Text" width="300" height="200">
-<img src="./images/screen-4.jpeg" alt="Alt Text" width="300" height="200">
+## Screenshot
+<img src="./images/screen-1.jpeg" alt="Alt Text" width="300" height="200"> <img src="./images/screen-2.jpeg" alt="Alt Text" width="300" height="200"> <img src="./images/screen-3.jpeg" alt="Alt Text" width="300" height="200"> <img src="./images/screen-4.jpeg" alt="Alt Text" width="300" height="200">
 
 ## WARNING
 
