@@ -10,6 +10,7 @@ import (
 	"folder-similarity/ui/progress"
 	"folder-similarity/ui/selectlistdialog"
 	"folder-similarity/ui/tree"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -280,6 +281,20 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					folder2, ok2 := m.mergeFolderPair.Folder2.(*core.FolderSimilarity)
 					if ok2 {
 						m.OpenFileExplorer(folder2.Folder.Path)
+					}
+				}
+			} else if msg.String() == "s" {
+				switch m.storage.(type) {
+				case *core.MemoryStorage:
+					memoryStorage := m.storage.(*core.MemoryStorage)
+					jsonData, err := memoryStorage.ExportStorage()
+					if err != nil {
+						m.logView.Error(err.Error())
+					}
+					m.logView.Info("Save the file list to db.json")
+					err = os.WriteFile("db.json", jsonData, 0644)
+					if err != nil {
+						m.logView.Error(err.Error())
 					}
 				}
 			}

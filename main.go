@@ -1,20 +1,24 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"folder-similarity/core"
 	"folder-similarity/ui"
 	logui "folder-similarity/ui/log"
 	"log"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 var rootPath string
+var dataPath string
 
 func main() {
 	flag.StringVar(&rootPath, "path", "", "root path")
+	flag.StringVar(&dataPath, "data", "", "load existing data from json file")
 	flag.Parse()
 
 	if rootPath == "" {
@@ -45,9 +49,25 @@ func main() {
 		}
 	}()
 
-	err := scanner.Scan()
-	if err != nil {
-		log.Fatal(err)
+	if dataPath != "" {
+		fmt.Println("Loading existing data from", dataPath)
+		jsonData, err := os.ReadFile(dataPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		var files []*core.File
+		err = json.Unmarshal(jsonData, &files)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, file := range files {
+			storage.AddFile(file)
+		}
+	} else {
+		err := scanner.Scan()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	close(logChan)
 

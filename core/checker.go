@@ -140,7 +140,18 @@ func (s *SimilarityChecker) CalculateSimilarity(storage Storage) error {
 
 func (s *SimilarityChecker) ContainsSimilarityGroup(path string) bool {
 	_, ok := s.similarityFolderMap[path]
-	return ok
+	if ok {
+		return true
+	}
+
+	// TODO: optimize this
+	for key, _ := range s.similarityFolderMap {
+		if strings.HasPrefix(key, path+string(filepath.Separator)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (s *SimilarityChecker) GetSimilarityFolderGroup(path string) [][2]*FolderSimilarity {

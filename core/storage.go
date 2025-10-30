@@ -3,6 +3,7 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -128,6 +129,25 @@ func (s *MemoryStorage) GetMatchedFiles() ([]*MatchedFileGroup, error) {
 	})
 
 	return matchedFiles, nil
+}
+
+func (s *MemoryStorage) ExportStorage() ([]byte, error) {
+	files := []File{}
+	s.hashMap.Range(func(key, value interface{}) bool {
+		if matched, ok := s.matchedFiles.Load(key); ok {
+			for _, file := range matched.(*MatchedFileGroup).Files {
+				files = append(files, *file)
+			}
+		} else {
+			files = append(files, *value.(*File))
+		}
+		return true
+	})
+	for i, _ := range files {
+		files[i].Parent = nil
+	}
+
+	return json.Marshal(files)
 }
 
 // NewMemoryStorage creates a new memory storage instance.
