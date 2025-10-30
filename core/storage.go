@@ -67,6 +67,11 @@ func (s *MemoryStorage) AddFile(file *File) error {
 
 	parentFolder.AddFile(file)
 
+	// skip file if empty
+	if file.Size == 0 {
+		return nil
+	}
+
 	// Record the file hash to fileHashMap
 	if matchedFile, ok := s.hashMap.Load(file.Hash); !ok {
 		s.hashMap.Store(file.Hash, file)
