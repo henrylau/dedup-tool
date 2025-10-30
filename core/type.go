@@ -23,10 +23,10 @@ type Folder struct {
 	Name           string
 	Path           string
 	Parent         *Folder
+	Folders        sync.Map
 	files          sync.Map
 	fileCount      int32
 	fileCountCache int32
-	Folders        sync.Map
 }
 
 // MatchedFileGroup represents a group of files with the same hash.

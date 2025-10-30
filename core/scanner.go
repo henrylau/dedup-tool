@@ -20,6 +20,7 @@ func (s *Scanner) Scan() error {
 	if s.Context == nil {
 		s.Context = context.Background()
 	}
+	hasher := imohash.New()
 
 	for _, path := range s.Path {
 		root, err := os.OpenRoot(path)
@@ -52,7 +53,7 @@ func (s *Scanner) Scan() error {
 				return fmt.Errorf("failed to stat file %s: %w", path, err)
 			}
 
-			hash, err := FileHash(f, imohash.New())
+			hash, err := getFileHash(f, hasher)
 			if err != nil {
 				return fmt.Errorf("failed to hash file %s: %w", path, err)
 			}

@@ -25,11 +25,7 @@ func (f *FolderSimilarity) DuplicatedPercentage() float64 {
 	return float64(f.DuplicateFileCount) * 100.0 / float64(f.FileCount)
 }
 
-// SimilarityChecker analyzes folders and files to find duplicates and calculate similarity percentages.
-type SimilarityChecker struct {
-	similarityFolderPairs map[string][2]*FolderSimilarity
-	similarityFolderMap   map[string][]string
-}
+// --- Helper function for similarity checker ---
 
 func folderPairKey(path1 string, path2 string) string {
 	if path1 > path2 {
@@ -38,7 +34,7 @@ func folderPairKey(path1 string, path2 string) string {
 	return fmt.Sprintf("%s:%s", path1, path2)
 }
 
-func (s *SimilarityChecker) getDuplicatedFolderPair(folder1 *Folder, folder2 *Folder, folders map[string][2]*FolderSimilarity) (*FolderSimilarity, *FolderSimilarity) {
+func getDuplicatedFolderPair(folder1 *Folder, folder2 *Folder, folders map[string][2]*FolderSimilarity) (*FolderSimilarity, *FolderSimilarity) {
 	key := folderPairKey(folder1.Path, folder2.Path)
 
 	pair, ok := folders[key]
@@ -67,6 +63,45 @@ func (s *SimilarityChecker) getDuplicatedFolderPair(folder1 *Folder, folder2 *Fo
 	return pair[1], pair[0]
 }
 
+// calculateParentFolderSimilarity calculates the similarity between two parent folders
+func calculateParentFolderSimilarity(
+	folder1, folder2 *FolderSimilarity,
+	folders map[string][2]*FolderSimilarity) {
+	if folder1 == folder2 || folder1.Parent == folder2.Parent {
+		return
+	}
+
+	parents := FileNameSplitByPath(folder1.Path)
+	parents2 := FileNameSplitByPath(folder2.Path)
+
+	// find the common parent of folder1 and folder2
+	commonParent := "."
+	for i := 0; i < len(parents) && i < len(parents2); i++ {
+		if parents[i] != parents2[i] {
+			break
+		}
+		commonParent = filepath.Join(commonParent, parents[i])
+	}
+
+	// loop all possible folder pair between folder1 and folder2
+	currentFolder1 := folder1.Folder
+	for currentFolder1.Path != commonParent {
+		currentFolder2 := folder2.Folder
+		for currentFolder2.Path != commonParent {
+			f1, f2 := getDuplicatedFolderPair(currentFolder1, currentFolder2, folders)
+			if f1 != folder1 {
+				f1.DuplicateFileCount += folder1.DuplicateFileCount
+			}
+			if f2 != folder2 {
+				f2.DuplicateFileCount += folder2.DuplicateFileCount
+			}
+
+			currentFolder2 = currentFolder2.Parent
+		}
+		currentFolder1 = currentFolder1.Parent
+	}
+}
+
 func getFolderSimilarity(path1, path2 string, folders map[string][2]*FolderSimilarity) (*FolderSimilarity, *FolderSimilarity, error) {
 	key := folderPairKey(path1, path2)
 	pair, ok := folders[key]
@@ -78,6 +113,62 @@ func getFolderSimilarity(path1, path2 string, folders map[string][2]*FolderSimil
 		return pair[0], pair[1], nil
 	}
 	return pair[1], pair[0], nil
+}
+
+func FileNameSplitByPath(path string) []string {
+	output := []string{filepath.Base(path)}
+	for path != "." && path != "/" {
+		folder := filepath.Base(filepath.Dir(path))
+		if folder != "." && folder != "/" {
+			output = append([]string{folder}, output...)
+		}
+		path = filepath.Dir(path)
+	}
+	return output
+}
+
+// Helper function to get the matched file pairs
+func GetMatchedFilePairs(folder1, folder2 *FolderSimilarity) (matchedPairs [][2]*File, folder1Only []*File, folder2Only []*File) {
+	files1 := folder1.GetFiles()
+	files2 := folder2.GetFiles()
+
+	sort.Slice(files1, func(i, j int) bool {
+		return files1[i].Hash < files1[j].Hash
+	})
+	sort.Slice(files2, func(i, j int) bool {
+		return files2[i].Hash < files2[j].Hash
+	})
+
+	a, b := 0, 0
+	for a < len(files1) || b < len(files2) {
+		if a >= len(files1) {
+			folder2Only = append(folder2Only, files2[b])
+			b++
+		} else if b >= len(files2) {
+			folder1Only = append(folder1Only, files1[a])
+			a++
+		} else if files1[a].Hash == files2[b].Hash {
+			matchedPairs = append(matchedPairs, [2]*File{files1[a], files2[b]})
+			a++
+			b++
+		} else if files1[a].Hash < files2[b].Hash {
+			folder1Only = append(folder1Only, files1[a])
+			a++
+		} else {
+			folder2Only = append(folder2Only, files2[b])
+			b++
+		}
+	}
+
+	return matchedPairs, folder1Only, folder2Only
+}
+
+// --- Helper end ---
+
+// SimilarityChecker analyzes folders and files to find duplicates and calculate similarity percentages.
+type SimilarityChecker struct {
+	similarityFolderPairs map[string][2]*FolderSimilarity
+	similarityFolderMap   map[string][]string
 }
 
 // CalculateSimilarity computes folder similarity based on duplicate files.
@@ -95,7 +186,7 @@ func (s *SimilarityChecker) CalculateSimilarity(storage Storage) error {
 	for _, matchedFile := range matchedFiles {
 		for i := 0; i < len(matchedFile.Files); i++ {
 			for j := i + 1; j < len(matchedFile.Files); j++ {
-				folder1, folder2 := s.getDuplicatedFolderPair(matchedFile.Files[i].Parent, matchedFile.Files[j].Parent, folders)
+				folder1, folder2 := getDuplicatedFolderPair(matchedFile.Files[i].Parent, matchedFile.Files[j].Parent, folders)
 
 				if _, ok := folder1.DuplicateFiles[matchedFile.Files[i].Name]; !ok {
 					folder1.DuplicateFiles[matchedFile.Files[i].Name] = matchedFile.Files[i]
@@ -113,7 +204,7 @@ func (s *SimilarityChecker) CalculateSimilarity(storage Storage) error {
 	parentFolders := maps.Clone(folders)
 	for _, matchedFolders := range folders {
 		folder1, folder2 := matchedFolders[0], matchedFolders[1]
-		s.calculateParentFolderSimilarity(folder1, folder2, parentFolders)
+		calculateParentFolderSimilarity(folder1, folder2, parentFolders)
 	}
 
 	s.similarityFolderPairs = parentFolders
@@ -188,57 +279,8 @@ func (s *SimilarityChecker) GetSimilarityFolderGroup(path string) [][2]*FolderSi
 		return p1 > p2
 	})
 
-	// filteredOutput := [][2]*FolderSimilarity{}
-
-	// a, b := float64(0), float64(0)
-	// for _, pair := range output {
-	// 	if pair[0].DuplicatedPercentage() != a || pair[1].DuplicatedPercentage() != b {
-	// 		a = pair[0].DuplicatedPercentage()
-	// 		b = pair[1].DuplicatedPercentage()
-	// 		filteredOutput = append(filteredOutput, pair)
-	// 	}
-	// }
-
+	// TODO: Implement filter
 	return output
-}
-
-// calculateParentFolderSimilarity calculates the similarity between two parent folders
-func (s *SimilarityChecker) calculateParentFolderSimilarity(
-	folder1, folder2 *FolderSimilarity,
-	folders map[string][2]*FolderSimilarity) {
-	if folder1 == folder2 || folder1.Parent == folder2.Parent {
-		return
-	}
-
-	parents := SplitPath(folder1.Path)
-	parents2 := SplitPath(folder2.Path)
-
-	// find the common parent of folder1 and folder2
-	commonParent := "."
-	for i := 0; i < len(parents) && i < len(parents2); i++ {
-		if parents[i] != parents2[i] {
-			break
-		}
-		commonParent = filepath.Join(commonParent, parents[i])
-	}
-
-	// loop all possible folder pair between folder1 and folder2
-	currentFolder1 := folder1.Folder
-	for currentFolder1.Path != commonParent {
-		currentFolder2 := folder2.Folder
-		for currentFolder2.Path != commonParent {
-			f1, f2 := s.getDuplicatedFolderPair(currentFolder1, currentFolder2, folders)
-			if f1 != folder1 {
-				f1.DuplicateFileCount += folder1.DuplicateFileCount
-			}
-			if f2 != folder2 {
-				f2.DuplicateFileCount += folder2.DuplicateFileCount
-			}
-
-			currentFolder2 = currentFolder2.Parent
-		}
-		currentFolder1 = currentFolder1.Parent
-	}
 }
 
 func (s *SimilarityChecker) GetSimilarityFolder() []string {
@@ -247,18 +289,6 @@ func (s *SimilarityChecker) GetSimilarityFolder() []string {
 	for path := range s.similarityFolderMap {
 		output[i] = path
 		i++
-	}
-	return output
-}
-
-func SplitPath(path string) []string {
-	output := []string{filepath.Base(path)}
-	for path != "." && path != "/" {
-		folder := filepath.Base(filepath.Dir(path))
-		if folder != "." && folder != "/" {
-			output = append([]string{folder}, output...)
-		}
-		path = filepath.Dir(path)
 	}
 	return output
 }
@@ -295,32 +325,9 @@ func (s *SimilarityChecker) GetChildFolderSimilarityMatch(f1, f2 *FolderSimilari
 	return matchedPairs, folder1Only, folder2Only
 }
 
-// helper function to filter file folder not within the map
-func FolderNotInMap(folders []*Folder, folderMap [][2]*FolderSimilarity) []*Folder {
-	childFolders := map[string]*Folder{}
-	for _, folder := range folders {
-		childFolders[folder.Path] = folder
-	}
-	for _, folder := range folderMap {
-		if _, ok := childFolders[folder[0].Folder.Path]; ok {
-			delete(childFolders, folder[0].Folder.Path)
-		}
-		if _, ok := childFolders[folder[1].Folder.Path]; ok {
-			delete(childFolders, folder[1].Folder.Path)
-		}
-	}
-	output := make([]*Folder, len(childFolders))
-	i := 0
-	for _, folder := range childFolders {
-		output[i] = folder
-		i++
-	}
-	return output
-}
-
 func (s *SimilarityChecker) DeleteSimilarityGroup(folder1, folder2 *FolderSimilarity) {
-	parents := SplitPath(folder1.Path)
-	parents2 := SplitPath(folder2.Path)
+	parents := FileNameSplitByPath(folder1.Path)
+	parents2 := FileNameSplitByPath(folder2.Path)
 
 	// find the common parent of folder1 and folder2
 	commonParent := "."
@@ -344,13 +351,9 @@ func (s *SimilarityChecker) DeleteSimilarityGroup(folder1, folder2 *FolderSimila
 			key := folderPairKey(currentFolder1.Path, currentFolder2.Path)
 			if _, ok := s.similarityFolderPairs[key]; ok {
 
-				f1, f2 := s.getDuplicatedFolderPair(currentFolder1, currentFolder2, s.similarityFolderPairs)
-				// if f1 != folder1 {
+				f1, f2 := getDuplicatedFolderPair(currentFolder1, currentFolder2, s.similarityFolderPairs)
 				f1.DuplicateFileCount -= f1DuplicateFileCount
-				// }
-				// if f2 != folder2 {
 				f2.DuplicateFileCount -= f2DuplicateFileCount
-				// }
 
 				if f2.DuplicateFileCount == 0 || f1.DuplicateFileCount == 0 {
 					delete(s.similarityFolderPairs, key)
@@ -377,42 +380,6 @@ func (s *SimilarityChecker) DeleteSimilarityGroup(folder1, folder2 *FolderSimila
 	}
 }
 
-// Helper function to get the matched file pairs
-func GetMatchedFilePairs(folder1, folder2 *FolderSimilarity) (matchedPairs [][2]*File, folder1Only []*File, folder2Only []*File) {
-	files1 := folder1.GetFiles()
-	files2 := folder2.GetFiles()
-
-	sort.Slice(files1, func(i, j int) bool {
-		return files1[i].Hash < files1[j].Hash
-	})
-	sort.Slice(files2, func(i, j int) bool {
-		return files2[i].Hash < files2[j].Hash
-	})
-
-	a, b := 0, 0
-	for a < len(files1) || b < len(files2) {
-		if a >= len(files1) {
-			folder2Only = append(folder2Only, files2[b])
-			b++
-		} else if b >= len(files2) {
-			folder1Only = append(folder1Only, files1[a])
-			a++
-		} else if files1[a].Hash == files2[b].Hash {
-			matchedPairs = append(matchedPairs, [2]*File{files1[a], files2[b]})
-			a++
-			b++
-		} else if files1[a].Hash < files2[b].Hash {
-			folder1Only = append(folder1Only, files1[a])
-			a++
-		} else {
-			folder2Only = append(folder2Only, files2[b])
-			b++
-		}
-	}
-
-	return matchedPairs, folder1Only, folder2Only
-}
-
 func (s *SimilarityChecker) GenerateMergeFolderPair(folder1, folder2 *FolderSimilarity) MergeFolderPair {
 	p := MergeFolderPair{
 		Folder1:   folder1,
@@ -437,7 +404,6 @@ func (s *SimilarityChecker) GenerateMergeFolderPair(folder1, folder2 *FolderSimi
 
 	matchedSubFolders, f1Folders, f2Folders := s.GetChildFolderSimilarityMatch(folder1, folder2)
 	for _, pair := range matchedSubFolders {
-		// p.folderPairs = append(p.folderPairs, MergeFolderPair{Folder1: pair[0], Folder2: pair[1], MatchType: MatchBothSide})
 		p.FolderPairs = append(p.FolderPairs, s.GenerateMergeFolderPair(pair[0], pair[1]))
 	}
 	for _, f1only := range f1Folders {
@@ -447,17 +413,4 @@ func (s *SimilarityChecker) GenerateMergeFolderPair(folder1, folder2 *FolderSimi
 		p.FolderPairs = append(p.FolderPairs, MergeFolderPair{Folder1: nil, Folder2: f2only, MatchType: MatchOnlyRight})
 	}
 	return p
-}
-
-// TODO: delete it later
-func (s *SimilarityChecker) DebugPringInfo() {
-	fmt.Println("Debug Print Info")
-	for k, _ := range s.similarityFolderPairs {
-		fmt.Println(k)
-	}
-	fmt.Println("--------------------------------")
-	for k, _ := range s.similarityFolderMap {
-		fmt.Println(k, "->", strings.Join(s.similarityFolderMap[k], ","))
-	}
-	fmt.Println("--------------------------------")
 }
