@@ -1,0 +1,29 @@
+.task
+bin
+frontend/dist
+frontend/node_modules
+build/linux/appimage/build
+build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+
+
+.cursor
+.codegraph
+.claude
+.mcp.json
+
+# OS / editor cruft
+.DS_Store
+
+# Local build artifacts (root-level binaries from `go build .`)
+/folder-similarity
+/folder-similarity.exe
+*.syso
+
+# App runtime data dumps
+/db.json
+/db*.json
+/jsonData.json
+
+# Scratch / experimentation
+/example_selectlist
+/cmd/video-thumb-test/
