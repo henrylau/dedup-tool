@@ -5,9 +5,32 @@ import (
 	"folder-similarity/app/dto"
 	"folder-similarity/app/service"
 	"log"
+	"os"
+	"strconv"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
+
+const (
+	defaultServerHost = "localhost"
+	defaultServerPort = 8080
+)
+
+func serverHost() string {
+	if h := os.Getenv("WAILS_SERVER_HOST"); h != "" {
+		return h
+	}
+	return defaultServerHost
+}
+
+func serverPort() int {
+	if p := os.Getenv("WAILS_SERVER_PORT"); p != "" {
+		if n, err := strconv.Atoi(p); err == nil && n > 0 {
+			return n
+		}
+	}
+	return defaultServerPort
+}
 
 //go:embed all:frontend/dist
 var assets embed.FS
@@ -33,6 +56,10 @@ func main() {
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
+		Server: application.ServerOptions{
+			Host: serverHost(),
+			Port: serverPort(),
+		},
 	})
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
@@ -45,6 +72,8 @@ func main() {
 		BackgroundColour: application.NewRGB(27, 38, 54),
 		URL:              "/",
 	})
+
+	printStartupBanner()
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

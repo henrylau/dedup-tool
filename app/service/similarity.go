@@ -9,6 +9,7 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -736,4 +737,60 @@ func (s *Similarity) ReadGalleryImagePreview(relPath string) (string, error) {
 
 	b64 := base64.StdEncoding.EncodeToString(data)
 	return fmt.Sprintf("data:%s;base64,%s", mt, b64), nil
+}
+
+// HomeDir returns the current user's home directory. Used by the server-mode folder picker
+// to seed its initial location.
+func (s *Similarity) HomeDir() (string, error) {
+	h, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Clean(h), nil
+}
+
+// ListDir lists immediate child directories of path. If filterExt is non-empty (e.g. ".json"),
+// matching files are included as well. Used by the server-mode folder/file picker.
+// path must be absolute.
+func (s *Similarity) ListDir(path string, filterExt string) ([]dto.DirEntry, error) {
+	if path == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+	if !filepath.IsAbs(path) {
+		return nil, fmt.Errorf("path must be absolute")
+	}
+	abs := filepath.Clean(path)
+	entries, err := os.ReadDir(abs)
+	if err != nil {
+		return nil, err
+	}
+	filterExt = strings.ToLower(filterExt)
+	out := make([]dto.DirEntry, 0, len(entries))
+	for _, e := range entries {
+		name := e.Name()
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+		isDir := e.IsDir()
+		if !isDir {
+			if filterExt == "" {
+				continue
+			}
+			if strings.ToLower(filepath.Ext(name)) != filterExt {
+				continue
+			}
+		}
+		out = append(out, dto.DirEntry{
+			Name:  name,
+			Path:  filepath.Join(abs, name),
+			IsDir: isDir,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].IsDir != out[j].IsDir {
+			return out[i].IsDir
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out, nil
 }

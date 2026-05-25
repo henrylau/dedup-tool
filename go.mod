@@ -3,6 +3,7 @@ module folder-similarity
 go 1.25.1
 
 require (
+	github.com/asticode/go-astiav v0.41.0
 	github.com/charmbracelet/bubbles v0.21.1-0.20250623103423-23b8fd6302d7
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
@@ -10,8 +11,8 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.3.0
 	github.com/muesli/gamut v0.3.1
 	github.com/rmhubbert/bubbletea-overlay v0.4.4
-	github.com/wailsapp/wails/v3 v3.0.0-alpha.78
-	golang.org/x/term v0.39.0
+	github.com/wailsapp/wails/v3 v3.0.0-alpha.95
+	golang.org/x/term v0.42.0
 )
 
 require (
@@ -19,6 +20,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.3.0 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
+	github.com/asticode/go-astikit v0.42.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
@@ -37,8 +39,8 @@ require (
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
-	github.com/go-git/go-billy/v5 v5.7.0 // indirect
-	github.com/go-git/go-git/v5 v5.16.4 // indirect
+	github.com/go-git/go-billy/v5 v5.9.0 // indirect
+	github.com/go-git/go-git/v5 v5.19.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
@@ -59,7 +61,7 @@ require (
 	github.com/muesli/clusters v0.0.0-20200529215643-2700303c1762 // indirect
 	github.com/muesli/kmeans v0.3.1 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
-	github.com/pjbgf/sha1cd v0.5.0 // indirect
+	github.com/pjbgf/sha1cd v0.6.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sahilm/fuzzy v0.1.1 // indirect
@@ -67,13 +69,13 @@ require (
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/skeema/knownhosts v1.3.2 // indirect
 	github.com/twmb/murmur3 v1.1.8 // indirect
-	github.com/wailsapp/go-webview2 v1.0.23 // indirect
+	github.com/wailsapp/wails/webview2 v1.0.24 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
-	golang.org/x/crypto v0.47.0 // indirect
-	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/crypto v0.50.0 // indirect
+	golang.org/x/net v0.53.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )

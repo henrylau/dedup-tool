@@ -1,41 +1,48 @@
-# Wails Server Mode Dockerfile
-# Multi-stage build for minimal image size
+# Wails server-mode image — multi-stage, self-contained build.
+# Stages: 1) build the React frontend  2) compile the Go server binary  3) tiny runtime image.
 
-# Build stage
-FROM golang:alpine AS builder
+# ─── 1. Frontend ────────────────────────────────────────────────────────────────
+FROM node:20-alpine AS frontend
+WORKDIR /app/frontend
 
+# Install deps with cache-friendly layer ordering.
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+# Build the Vite bundle into /app/frontend/dist.
+COPY frontend/ ./
+RUN npm run build
+
+# ─── 2. Go server binary ────────────────────────────────────────────────────────
+FROM golang:1.25-alpine AS builder
 WORKDIR /app
 
-# Install build dependencies
 RUN apk add --no-cache git
 
-# Copy source code
+# Module cache first — re-uses layer when source changes but deps don't.
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Then the rest of the source, plus the frontend dist (needed for //go:embed).
 COPY . .
+COPY --from=frontend /app/frontend/dist ./frontend/dist
 
-# Remove local replace directive if present (for production builds)
-RUN sed -i '/^replace/d' go.mod || true
+# Pure-Go server build. CGO is off (Alpine default); the videothumb package falls
+# back to its no-CGO stub under -tags server.
+ENV CGO_ENABLED=0
+RUN go build -tags server -trimpath -ldflags="-s -w" -o /out/server .
 
-# Download dependencies
-RUN go mod tidy
+# ─── 3. Runtime ─────────────────────────────────────────────────────────────────
+FROM gcr.io/distroless/static-debian12:nonroot
+WORKDIR /
 
-# Build the server binary
-RUN go build -tags server -ldflags="-s -w" -o server .
+COPY --from=builder /out/server /server
 
-# Runtime stage - minimal image
-FROM gcr.io/distroless/static-debian12
-
-# Copy the binary
-COPY --from=builder /app/server /server
-
-# Copy frontend assets
-COPY --from=builder /app/frontend/dist /frontend/dist
-
-# Expose the default port
+# Bind to all interfaces inside the container; override at runtime if you want
+# to constrain it. The internal port stays 8080 — remap on the host with -p.
+ENV WAILS_SERVER_HOST=0.0.0.0 \
+    WAILS_SERVER_PORT=8080
 EXPOSE 8080
 
-# Bind to all interfaces (required for Docker)
-# Can be overridden at runtime with -e WAILS_SERVER_HOST=...
-ENV WAILS_SERVER_HOST=0.0.0.0
-
-# Run the server
+USER nonroot:nonroot
 ENTRYPOINT ["/server"]

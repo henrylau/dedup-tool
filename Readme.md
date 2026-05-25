@@ -151,6 +151,32 @@ wails3 task windows:package                 # NSIS
 wails3 task windows:package FORMAT=msix     # MSIX
 ```
 
+### Server mode (browser UI, no desktop window)
+
+The same Wails app can run as a local HTTP server and serve the React UI in a browser. Useful for headless boxes, Docker, or when you just prefer a tab over a native window.
+
+```
+# Build + run in one step
+wails3 task run:server
+
+# Or build the binary only (output: bin/folder-similarity-server)
+wails3 task build:server
+```
+
+Then open **http://localhost:8080** in your browser. Default host/port come from `WAILS_SERVER_HOST` and `WAILS_SERVER_PORT` env vars (defaults: `localhost` / `8080`).
+
+Containerised:
+
+```
+wails3 task build:docker             # builds image via build/docker/Dockerfile.server
+wails3 task run:docker               # runs on :8080
+wails3 task run:docker PORT=9000     # remap host port
+```
+
+In server mode the **native file dialogs** (`Browse…`, `Save as…`) are replaced by an in-browser folder/JSON picker (`Similarity.ListDir`) and a download via Blob. Other UI is identical to the desktop binary.
+
+**Localhost-only by design** — "Reveal in Finder / Explorer" and "Open" actions shell out (`open`/`explorer`/`xdg-open`) on the machine running the server. If you expose the server beyond localhost (e.g. `WAILS_SERVER_HOST=0.0.0.0`), expect those buttons to do nothing useful for remote browsers, and treat the app as single-user (one shared in-memory `Similarity` instance).
+
 ## Limitation
 
 - only scan the file from single path

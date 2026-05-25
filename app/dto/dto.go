@@ -49,6 +49,13 @@ type ProgressEvent struct {
 	Error   string `json:"error,omitempty"`
 }
 
+// DirEntry is a single filesystem entry used by ListDir (server-mode directory picker).
+type DirEntry struct {
+	Name  string `json:"name"`
+	Path  string `json:"path"`
+	IsDir bool   `json:"isDir"`
+}
+
 // FolderNode is a JSON tree node for the folder view.
 type FolderNode struct {
 	Path           string       `json:"path"`

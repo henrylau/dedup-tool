@@ -29,8 +29,13 @@ import { ExistsSquares } from "./components/merge/ExistsSquares";
 import { FileNameCell } from "./components/merge/FileNameCell";
 import { MergePairFileSizeBars } from "./components/merge/MergePairFileSizeBars";
 import { ExplorerSidePanel } from "./components/gallery/ExplorerSidePanel";
+import { ServerFolderBrowser } from "./components/dialog/ServerFolderBrowser";
+
+type ServerPicker = { kind: "folder" | "json"; resolve: (path: string) => void } | null;
 
 function App() {
+  const [serverMode, setServerMode] = useState(false);
+  const [serverPicker, setServerPicker] = useState<ServerPicker>(null);
   const [appState, setAppState] = useState<AppState | null>(null);
   const [tree, setTree] = useState<FolderNode | null>(null);
   const [merge, setMerge] = useState<MergePreview | null>(null);
@@ -223,6 +228,20 @@ function App() {
   }, [refresh, treeSimilarityOnly]);
 
   useEffect(() => {
+    void Similarity.IsServerMode()
+      .then((v) => setServerMode(Boolean(v)))
+      .catch(() => setServerMode(false));
+  }, []);
+
+  const pickServerPath = useCallback(
+    (kind: "folder" | "json") =>
+      new Promise<string>((resolve) => {
+        setServerPicker({ kind, resolve });
+      }),
+    [],
+  );
+
+  useEffect(() => {
     const offLog = Events.On("log", (ev: any) => {
       const d = ev?.data;
       if (typeof d === "string") { pushLog(d); return; }
@@ -279,7 +298,7 @@ function App() {
   const pickAndScan = async () => {
     setErr(null);
     try {
-      const p = await Similarity.PickRootFolder();
+      const p = serverMode ? await pickServerPath("folder") : await Similarity.PickRootFolder();
       if (!p) return;
       setScanDuration("");
       setScanFileCount(0);
@@ -292,7 +311,7 @@ function App() {
   const loadJson = async () => {
     setErr(null);
     try {
-      const p = await Similarity.PickJSONFile();
+      const p = serverMode ? await pickServerPath("json") : await Similarity.PickJSONFile();
       if (!p) return;
       await Similarity.LoadFromJSONFile(p);
       await Similarity.SelectFolder(".");
@@ -305,7 +324,20 @@ function App() {
   const exportJson = async () => {
     setErr(null);
     try {
-      await Similarity.ExportDataToJSON();
+      if (serverMode) {
+        const data = await Similarity.GetExportedJSON();
+        const blob = new Blob([data], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "db.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } else {
+        await Similarity.ExportDataToJSON();
+      }
       await refresh();
     } catch (e: any) {
       setErr(e?.message || String(e));
@@ -637,6 +669,15 @@ function App() {
       </header>
 
       {err ? <div className="err-banner">{err}<button type="button" onClick={() => setErr(null)}>✕</button></div> : null}
+
+      {/* Server-mode folder / JSON picker (modal) */}
+      <ServerFolderBrowser
+        open={serverPicker !== null}
+        title={serverPicker?.kind === "json" ? "Select JSON file" : "Select scan root folder"}
+        filterExt={serverPicker?.kind === "json" ? ".json" : undefined}
+        onSelect={(p) => { const r = serverPicker?.resolve; setServerPicker(null); r?.(p); }}
+        onClose={() => { const r = serverPicker?.resolve; setServerPicker(null); r?.(""); }}
+      />
 
       {/* Similarity group picker (modal) */}
       {needGroup && st?.groupLabels ? (

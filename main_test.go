@@ -34,6 +34,7 @@ func ScanFiles(root []string, workerCount int) {
 }
 
 func TestMemoryStorage(t *testing.T) {
+	t.Skip("requires local jsonData.json fixture (intentionally not committed)")
 	storage := core.NewMemoryStorage()
 	checker := core.SimilarityChecker{}
 	jsonDataBytes, err := os.ReadFile("jsonData.json")
@@ -97,6 +98,7 @@ func TestOpenFinder(t *testing.T) {
 }
 
 func TestListFolder(t *testing.T) {
+	t.Skip("requires local ../photoview/assets fixture (developer machine only)")
 	root, err := os.OpenRoot("../photoview/assets")
 	if err != nil {
 		t.Fatalf("Failed to open root: %v", err)
@@ -138,6 +140,7 @@ func TestListFolder(t *testing.T) {
 }
 
 func TestLoadData(t *testing.T) {
+	t.Skip("requires local db 2.json fixture (intentionally not committed)")
 
 	storage := core.NewMemoryStorage()
 	checker := core.SimilarityChecker{}

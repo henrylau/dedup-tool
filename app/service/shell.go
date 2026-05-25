@@ -51,6 +51,25 @@ func (s *Similarity) ExportDataToJSON() error {
 	return nil
 }
 
+// GetExportedJSON returns the current in-memory file list as a JSON string.
+// Used by server-mode frontend to trigger a browser download (Blob + <a download>).
+func (s *Similarity) GetExportedJSON() (string, error) {
+	if s.applyRunningNow() {
+		return "", fmt.Errorf("apply in progress; wait or cancel before export")
+	}
+	s.mu.RLock()
+	st := s.storage
+	s.mu.RUnlock()
+	if st == nil {
+		return "", fmt.Errorf("no data to export: scan or load JSON first")
+	}
+	data, err := st.ExportStorage()
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 // RevealMergeFolder opens the system file manager for the left or right folder of the active merge (phase 6; TUI: OpenFileExplorer). side is "left" or "right".
 func (s *Similarity) RevealMergeFolder(side string) error {
 	s.mu.RLock()
