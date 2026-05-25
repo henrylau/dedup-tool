@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 
 	"github.com/kalafut/imohash"
 )
@@ -13,7 +14,11 @@ type Scanner struct {
 	Path    []string
 	Storage Storage
 	Logger  func(message string)
-	Context context.Context
+	// OnFileAdded is optional; filesScanned is the running total for this Scan() call (after each successful AddFile).
+	OnFileAdded func(filesScanned int)
+	Context     context.Context
+	// SkipExtensions: nil uses DefaultSkipExtensions; empty slice scans every extension.
+	SkipExtensions []string
 }
 
 func (s *Scanner) Scan() error {
@@ -21,7 +26,9 @@ func (s *Scanner) Scan() error {
 		s.Context = context.Background()
 	}
 	hasher := imohash.New()
+	skipIdx := NormalizedSkipExtensionSet(s.SkipExtensions)
 
+	var filesScanned int
 	for _, path := range s.Path {
 		root, err := os.OpenRoot(path)
 		if err != nil {
@@ -39,6 +46,9 @@ func (s *Scanner) Scan() error {
 				return err
 			}
 			if d.IsDir() || d.Name()[0] == '.' {
+				return nil
+			}
+			if ExtensionMatchesSkipSet(filepath.Ext(d.Name()), skipIdx) {
 				return nil
 			}
 
@@ -65,6 +75,11 @@ func (s *Scanner) Scan() error {
 				ModTime: stats.ModTime(),
 				Name:    stats.Name(),
 			})
+
+			filesScanned++
+			if s.OnFileAdded != nil {
+				s.OnFileAdded(filesScanned)
+			}
 
 			if s.Logger != nil {
 				s.Logger(fmt.Sprintf("scanned file %s: %s", path, hash))

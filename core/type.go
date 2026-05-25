@@ -80,6 +80,31 @@ func (f *Folder) GetFileCount() int {
 	return c
 }
 
+// GetDirectFileCount returns the number of files directly in this folder (excluding files in subfolders).
+func (f *Folder) GetDirectFileCount() int {
+	return int(atomic.LoadInt32(&f.fileCount))
+}
+
+// GetDirectFilesSize returns the sum of file sizes for files directly in this folder (not in subfolders).
+func (f *Folder) GetDirectFilesSize() int64 {
+	var sum int64
+	f.files.Range(func(key, value interface{}) bool {
+		sum += value.(*File).Size
+		return true
+	})
+	return sum
+}
+
+// GetTotalFilesSizeRecursive returns the sum of sizes of all files in this folder and subfolders.
+func (f *Folder) GetTotalFilesSizeRecursive() int64 {
+	sum := f.GetDirectFilesSize()
+	f.Folders.Range(func(key, value interface{}) bool {
+		sum += value.(*Folder).GetTotalFilesSizeRecursive()
+		return true
+	})
+	return sum
+}
+
 // GetFolders returns all subfolders of this folder.
 func (f *Folder) GetFolders() []*Folder {
 	folders := []*Folder{}

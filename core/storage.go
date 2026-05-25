@@ -23,6 +23,11 @@ type MemoryStorage struct {
 	folders      sync.Map
 	matchedFiles sync.Map
 	hashMap      sync.Map
+
+	// DupTrackingSkipExtensions: nil uses DefaultSkipExtensions for duplicate/hash indexing skip rules;
+	// a non-nil empty slice disables extension-based duplicate skipping (all extensions participate).
+	DupTrackingSkipExtensions []string
+	dupSkipExt                map[string]struct{}
 }
 
 var _ Storage = &MemoryStorage{}
@@ -35,6 +40,10 @@ func (s *MemoryStorage) RemoveFile(file *File) error {
 		return err
 	}
 	parentFolder.RemoveFile(file)
+
+	if ExtensionMatchesSkipSet(filepath.Ext(file.Name), s.dupSkipExt) {
+		return nil
+	}
 
 	if matchedPair, ok := s.matchedFiles.Load(file.Hash); ok {
 		pair := matchedPair.(*MatchedFileGroup)
@@ -69,6 +78,10 @@ func (s *MemoryStorage) AddFile(file *File) error {
 
 	// skip file if empty
 	if file.Size == 0 {
+		return nil
+	}
+
+	if ExtensionMatchesSkipSet(filepath.Ext(file.Name), s.dupSkipExt) {
 		return nil
 	}
 
@@ -155,7 +168,16 @@ func (s *MemoryStorage) ExportStorage() ([]byte, error) {
 	return json.Marshal(files)
 }
 
-// NewMemoryStorage creates a new memory storage instance.
+// NewMemoryStorage creates storage with default duplicate-tracking skip rules (.txt, .lnk).
 func NewMemoryStorage() *MemoryStorage {
-	return &MemoryStorage{}
+	return NewMemoryStorageWithDupTrackingSkipRules(nil)
+}
+
+// NewMemoryStorageWithDupTrackingSkipRules mirrors Scanner.SkipExtensions semantics:
+// nil rules → DefaultSkipExtensions; empty slice → no extension skipped for duplicates.
+func NewMemoryStorageWithDupTrackingSkipRules(exts []string) *MemoryStorage {
+	return &MemoryStorage{
+		DupTrackingSkipExtensions: exts,
+		dupSkipExt:                NormalizedSkipExtensionSet(exts),
+	}
 }
