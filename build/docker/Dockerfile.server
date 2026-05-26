@@ -66,6 +66,25 @@ RUN go mod download
 COPY . .
 COPY --from=frontend /app/frontend/dist ./frontend/dist
 
+# Wails v3-alpha-95 quirk: its linux WebKit/GTK cgo files are gated only on "linux && cgo"
+# (missing the !server guard the GUI backend files have). A CGO build — which we need for the
+# FFmpeg thumbnails — therefore pulls in gtk4/webkitgtk-6.0 even in server mode, and those
+# packages aren't even available on bookworm. None of these symbols are reachable headless
+# (GetWebkitVersion and the webview asset bridge are only used by the GUI, all !server-gated),
+# so add the missing !server guard to keep the build and runtime image free of GTK/WebKit.
+RUN set -eux; \
+    base="$(go env GOMODCACHE)/github.com/wailsapp/wails/v3@v3.0.0-alpha.95"; \
+    for f in \
+        internal/operatingsystem/webkit_linux.go \
+        internal/assetserver/webview/request_linux.go \
+        internal/assetserver/webview/responsewriter_linux.go \
+        internal/assetserver/webview/webkit_linux.go; do \
+        p="$base/$f"; \
+        chmod u+w "$(dirname "$p")" "$p"; \
+        sed -i 's@^//go:build linux && cgo && !gtk3 && !android$@//go:build linux \&\& cgo \&\& !gtk3 \&\& !android \&\& !server@' "$p"; \
+        grep -q '&& !server' "$p"; \
+    done
+
 # CGO ON; build tags enable Wails server mode + FFmpeg-backed thumbnails.
 ENV CGO_ENABLED=1
 RUN go build -tags "server videothumb" -trimpath -ldflags="-s -w" -o /out/server .
