@@ -49,5 +49,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # FFmpeg is built from source inside the Dockerfile — without an
+          # effective cache the first build can be 30-60 min under QEMU. Cache
+          # the FFmpeg builder stage so subsequent unchanged builds are fast.
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: false

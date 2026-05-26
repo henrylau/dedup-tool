@@ -1,45 +1,85 @@
-# Wails server-mode image — multi-stage, self-contained build.
-# Stages: 1) build the React frontend  2) compile the Go server binary  3) tiny runtime image.
+# folder-similarity server image — Wails v3 server mode + FFmpeg 8.0 video thumbnails.
+#
+# Stages
+#   1. frontend       Vite/React → frontend/dist
+#   2. ffmpeg-builder Builds FFmpeg 8.0 shared libs from source (multi-arch friendly).
+#                     Default-config build minus ffmpeg/ffprobe/docs/manpages — we
+#                     only need libav* for go-astiav, not the CLI tools.
+#   3. go-builder     CGO build of the Go server with -tags "server videothumb",
+#                     linking against the freshly-built FFmpeg dev libs.
+#   4. runtime        distroless/cc-debian12:nonroot + FFmpeg shared libs.
 
 # ─── 1. Frontend ────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS frontend
 WORKDIR /app/frontend
-
-# Install deps with cache-friendly layer ordering.
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
-
-# Build the Vite bundle into /app/frontend/dist.
 COPY frontend/ ./
 RUN npm run build
 
-# ─── 2. Go server binary ────────────────────────────────────────────────────────
-FROM golang:1.25-alpine AS builder
+# ─── 2. FFmpeg 8.0 (multi-arch source build) ────────────────────────────────────
+FROM debian:bookworm-slim AS ffmpeg-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl ca-certificates xz-utils \
+        build-essential pkg-config nasm yasm \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG FFMPEG_VERSION=8.0
+WORKDIR /src
+RUN curl -fsSL "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" | tar -xJ
+
+WORKDIR /src/ffmpeg-${FFMPEG_VERSION}
+RUN ./configure \
+        --prefix=/opt/ffmpeg \
+        --enable-shared --disable-static \
+        --enable-pic \
+        --disable-programs \
+        --disable-doc --disable-htmlpages --disable-manpages --disable-podpages --disable-txtpages \
+        --disable-debug \
+        --disable-network \
+        --disable-everything \
+        --enable-demuxer=mov,matroska,avi,mpegps,mpegts,mpegvideo,flv,asf,webm_dash_manifest,webm \
+        --enable-decoder=h264,hevc,vp8,vp9,av1,mpeg4,mpeg2video,mjpeg,png,prores,wmv3,vc1,theora,flv \
+        --enable-parser=h264,hevc,vp8,vp9,av1,mpeg4video,mpegvideo,mjpeg,png \
+        --enable-protocol=file \
+        --enable-swscale \
+    && make -j"$(nproc)" \
+    && make install
+
+# ─── 3. Go server binary (CGO + FFmpeg) ─────────────────────────────────────────
+FROM golang:1.25-bookworm AS go-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pull FFmpeg dev artifacts (headers, .so, .pc) from stage 2.
+COPY --from=ffmpeg-builder /opt/ffmpeg /opt/ffmpeg
+ENV PKG_CONFIG_PATH=/opt/ffmpeg/lib/pkgconfig \
+    LD_LIBRARY_PATH=/opt/ffmpeg/lib
+
 WORKDIR /app
-
-RUN apk add --no-cache git
-
-# Module cache first — re-uses layer when source changes but deps don't.
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Then the rest of the source, plus the frontend dist (needed for //go:embed).
 COPY . .
 COPY --from=frontend /app/frontend/dist ./frontend/dist
 
-# Pure-Go server build. CGO is off (Alpine default); the videothumb package falls
-# back to its no-CGO stub under -tags server.
-ENV CGO_ENABLED=0
-RUN go build -tags server -trimpath -ldflags="-s -w" -o /out/server .
+# CGO ON; build tags enable Wails server mode + FFmpeg-backed thumbnails.
+ENV CGO_ENABLED=1
+RUN go build -tags "server videothumb" -trimpath -ldflags="-s -w" -o /out/server .
 
-# ─── 3. Runtime ─────────────────────────────────────────────────────────────────
-FROM gcr.io/distroless/static-debian12:nonroot
-WORKDIR /
+# ─── 4. Runtime ─────────────────────────────────────────────────────────────────
+FROM gcr.io/distroless/cc-debian12:nonroot
 
-COPY --from=builder /out/server /server
+# Server binary.
+COPY --from=go-builder /out/server /server
 
-# Bind to all interfaces inside the container; override at runtime if you want
-# to constrain it. The internal port stays 8080 — remap on the host with -p.
+# FFmpeg shared libs — must be on the loader path or LD_LIBRARY_PATH.
+COPY --from=ffmpeg-builder /opt/ffmpeg/lib /opt/ffmpeg/lib
+ENV LD_LIBRARY_PATH=/opt/ffmpeg/lib
+
 ENV WAILS_SERVER_HOST=0.0.0.0 \
     WAILS_SERVER_PORT=8080
 EXPOSE 8080

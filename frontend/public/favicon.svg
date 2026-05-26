@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7c4dff"/>
+      <stop offset="100%" stop-color="#1b2636"/>
+    </linearGradient>
+    <linearGradient id="folder" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e9e6ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14"/>
+      <feOffset dx="0" dy="18"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background squircle -->
+  <rect x="0" y="0" width="1024" height="1024" rx="224" ry="224" fill="url(#bg)"/>
+
+  <!-- Folder -->
+  <g filter="url(#shadow)">
+    <!-- Tab (top-left of the folder) -->
+    <path d="
+      M 232 268
+      Q 232 240 260 240
+      L 408 240
+      Q 432 240 446 258
+      L 488 304
+      L 232 304
+      Z
+    " fill="url(#folder)"/>
+    <!-- Body -->
+    <rect x="200" y="296" width="624" height="528" rx="44" ry="44" fill="url(#folder)"/>
+    <!-- Subtle inner seam between tab and body -->
+    <line x1="232" y1="304" x2="488" y2="304" stroke="#d8d3f5" stroke-width="2"/>
+  </g>
+
+  <!-- ≈ symbol (two stacked tildes) -->
+  <g stroke="#7c4dff" stroke-width="56" stroke-linecap="round" fill="none">
+    <path d="M 320 520 C 380 470, 440 470, 512 520 S 644 570, 704 520"/>
+    <path d="M 320 660 C 380 610, 440 610, 512 660 S 644 710, 704 660"/>
+  </g>
+</svg>
